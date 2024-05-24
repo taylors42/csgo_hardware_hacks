@@ -1,159 +1,178 @@
 #include <hidboot.h>
 #include <Mouse.h>
+#include <U8g2lib.h>
+#include <Wire.h>
+#define OLED_ADDRESS 0x3C
 
-bool rcs_toggle = false;
-const int ledPin = LED_BUILTIN;
-const float sensitivity = 1.8;
-
-// delaty factor's in ms
-const int delay_factor_ak47 = 98;
-const int delay_factor_m4a4 = 88;
-const int delay_factor_galil = 90
-
-// controller vars
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+const float sensitivity = 1.7;
+const float m4_sense = 1.20;
+const float gl_sense = 0;
 int controller = 0;
+const float ak_sense = 1.07;
+const int delay_factor_ak47 = 90;
+const int delay_factor_m4a4 = 88;
+const int delay_factor_galil = 90;
 
-// arrays for recoil control
 const int ak47_rcs[][2] = {
-  {-4 * sensitivity, 7 * sensitivity}, 
-  {4 * sensitivity, 19 * sensitivity},  
-  {-3 * sensitivity, 29 * sensitivity},  
-  {-1 * sensitivity, 31 * sensitivity},  
-  {13 * sensitivity, 31 * sensitivity}, 
-  {8 * sensitivity, 28 * sensitivity},   
-  {13 * sensitivity, 21 * sensitivity},  
-  {-17 * sensitivity, 12 * sensitivity}, 
-  {-42 * sensitivity, -3 * sensitivity}, 
-  {-21 * sensitivity, 2 * sensitivity},  
-  {12* sensitivity,  11 * sensitivity},  
-  {-15 * sensitivity, 7 * sensitivity},  
-  {-26 * sensitivity, -8 * sensitivity},   
-  {-3 * sensitivity, 4 * sensitivity},    
-  {40 * sensitivity, 1 * sensitivity},   
-  {19 * sensitivity, 7 * sensitivity},   
-  {14 * sensitivity, 10 * sensitivity},   
-  {27 * sensitivity, 0 * sensitivity},   
-  {33 * sensitivity, -10 * sensitivity},  
-  {-21 * sensitivity, -2 * sensitivity},   
-  {-7 * sensitivity, 3 * sensitivity},   
-  {-8 * sensitivity, 4 * sensitivity},   
-  {19 * sensitivity, -3 * sensitivity},    
-  {5 * sensitivity, 6 * sensitivity},    
-  {-20 * sensitivity, -1 * sensitivity},   
-  {-33 * sensitivity, -4 * sensitivity},
-  {-45 * sensitivity, -21 * sensitivity},
-  {-14 * sensitivity, 1 * sensitivity}, 
-  {-4 * sensitivity, 7 * sensitivity}  
+  {-4 * sensitivity * ak_sense, 7 * sensitivity * ak_sense}, 
+  {4 * sensitivity * ak_sense, 19 * sensitivity * ak_sense},  
+  {-3 * sensitivity * ak_sense, 29 * sensitivity * ak_sense},  
+  {-1 * sensitivity * ak_sense, 31 * sensitivity * ak_sense},  
+  {13 * sensitivity * ak_sense, 31 * sensitivity * ak_sense}, 
+  {8 * sensitivity * ak_sense, 28 * sensitivity * ak_sense},   
+  {13 * sensitivity * ak_sense, 21 * sensitivity * ak_sense},  
+  {-17 * sensitivity * ak_sense, 12 * sensitivity * ak_sense}, 
+  {-42 * sensitivity * ak_sense, -3 * sensitivity * ak_sense}, 
+  {-21 * sensitivity * ak_sense, 2 * sensitivity * ak_sense},  
+  {12* sensitivity * ak_sense,  11 * sensitivity * ak_sense},  
+  {-15 * sensitivity * ak_sense, 7 * sensitivity * ak_sense},  
+  {-26 * sensitivity * ak_sense, -8 * sensitivity * ak_sense},   
+  {-3 * sensitivity * ak_sense, 4 * sensitivity * ak_sense},    
+  {40 * sensitivity * ak_sense, 1 * sensitivity * ak_sense},   
+  {19 * sensitivity * ak_sense, 7 * sensitivity * ak_sense},   
+  {14 * sensitivity * ak_sense, 10 * sensitivity * ak_sense},   
+  {27 * sensitivity * ak_sense, 0 * sensitivity * ak_sense},   
+  {33 * sensitivity * ak_sense, -10 * sensitivity * ak_sense},  
+  {-21 * sensitivity * ak_sense, -2 * sensitivity * ak_sense},   
+  {-7 * sensitivity * ak_sense, 3 * sensitivity * ak_sense},   
+  {-8 * sensitivity * ak_sense, 4 * sensitivity * ak_sense},   
+  {19 * sensitivity * ak_sense, -3 * sensitivity * ak_sense},    
+  {5 * sensitivity * ak_sense, 6 * sensitivity * ak_sense},    
+  {-20 * sensitivity * ak_sense, -1 * sensitivity * ak_sense},   
+  {-33 * sensitivity * ak_sense, -4 * sensitivity * ak_sense},
+  {-45 * sensitivity * ak_sense, -21 * sensitivity * ak_sense},
+  {-14 * sensitivity * ak_sense, 1 * sensitivity * ak_sense}, 
+  {-4 * sensitivity * ak_sense, 7 * sensitivity * ak_sense}  
 };
 
-const int m4a4_rcs[][2] = {
-  {2 * sensitivity, 7 * sensitivity},
-  {0 * sensitivity, 9 * sensitivity},
-  {-6 * sensitivity, 16 * sensitivity},
-  {7 * sensitivity, 21 * sensitivity},
-  {-9 * sensitivity, 23 * sensitivity},
-  {-5 * sensitivity, 27 * sensitivity},
-  {16 * sensitivity, 15 * sensitivity},
-  {11 * sensitivity, 13 * sensitivity},
-  {22 * sensitivity, 5 * sensitivity},
-  {-4 * sensitivity, 11 * sensitivity},
-  {-18 * sensitivity, 6 * sensitivity},
-  {-30 * sensitivity, -4 * sensitivity},
-  {-24 * sensitivity, 0 * sensitivity},
-  {-25 * sensitivity, -6 * sensitivity},
-  {0 * sensitivity, 4 * sensitivity},
-  {8 * sensitivity, 4 * sensitivity},
-  {-11 * sensitivity, 1 * sensitivity},
-  {-13 * sensitivity, -2 * sensitivity},
-  {2 * sensitivity, 2 * sensitivity},
-  {33 * sensitivity, -1 * sensitivity},
-  {10 * sensitivity, 6 * sensitivity},
-  {27 * sensitivity, 3 * sensitivity},
-  {10 * sensitivity, 2 * sensitivity},
-  {11 * sensitivity, 0 * sensitivity},
-  {-12 * sensitivity, 0 * sensitivity},
-  {6 * sensitivity, 5 * sensitivity},
-  {4 * sensitivity, 5 * sensitivity},
-  {3 * sensitivity, 1 * sensitivity},
-  {4 * sensitivity, -1 * sensitivity}
+const int m4a4_rcs[][2] = { 
+  {2 * sensitivity * m4_sense, 7 * sensitivity * m4_sense},
+  {0 * sensitivity * m4_sense, 9 * sensitivity * m4_sense},
+  {-6 * sensitivity * m4_sense, 16 * sensitivity * m4_sense},
+  {7 * sensitivity * m4_sense, 21 * sensitivity * m4_sense},
+  {-9 * sensitivity * m4_sense, 23 * sensitivity * m4_sense},
+  {-5 * sensitivity * m4_sense, 27 * sensitivity * m4_sense},
+  {16 * sensitivity * m4_sense, 15 * sensitivity * m4_sense},
+  {11 * sensitivity * m4_sense, 13 * sensitivity * m4_sense},
+  {22 * sensitivity * m4_sense, 5 * sensitivity * m4_sense},
+  {-4 * sensitivity * m4_sense, 11 * sensitivity * m4_sense},
+  {-18 * sensitivity * m4_sense, 6 * sensitivity * m4_sense},
+  {-30 * sensitivity * m4_sense, -4 * sensitivity * m4_sense},
+  {-24 * sensitivity * m4_sense, 0 * sensitivity * m4_sense},
+  {-25 * sensitivity * m4_sense, -6 * sensitivity * m4_sense},
+  {0 * sensitivity * m4_sense, 4 * sensitivity * m4_sense},
+  {8 * sensitivity * m4_sense, 4 * sensitivity * m4_sense},
+  {-11 * sensitivity * m4_sense, 1 * sensitivity * m4_sense},
+  {-13 * sensitivity * m4_sense, -2 * sensitivity * m4_sense},
+  {2 * sensitivity * m4_sense, 2 * sensitivity * m4_sense},
+  {33 * sensitivity * m4_sense, -1 * sensitivity * m4_sense},
+  {10 * sensitivity * m4_sense, 6 * sensitivity * m4_sense},
+  {27 * sensitivity * m4_sense, 3 * sensitivity * m4_sense},
+  {10 * sensitivity * m4_sense, 2 * sensitivity * m4_sense},
+  {11 * sensitivity * m4_sense, 0 * sensitivity * m4_sense},
+  {-12 * sensitivity * m4_sense, 0 * sensitivity * m4_sense},
+  {6 * sensitivity * m4_sense, 5 * sensitivity * m4_sense},
+  {4 * sensitivity * m4_sense, 5 * sensitivity * m4_sense},
+  {3 * sensitivity * m4_sense, 1 * sensitivity * m4_sense},
+  {4 * sensitivity * m4_sense, -1 * sensitivity * m4_sense}
 };
-
-const int mac10_rcs[][2] = {
-  
-}
 
 const int galil_rcs[][2] = {
-  {4 * sensitivity, 4 * sensitivity},
-  {-2 * sensitivity, 5 * sensitivity},
-  {6 * sensitivity, 10 * sensitivity},
-  {12 * sensitivity, 15 * sensitivity},
-  {-1 * sensitivity, 21 * sensitivity},
-  {2 * sensitivity, 24 * sensitivity},
-  {6 * sensitivity, 16 * sensitivity},
-  {11 * sensitivity, 10 * sensitivity},
-  {-4 * sensitivity, 14 * sensitivity},
-  {-22 * sensitivity, 8 * sensitivity},
-  {-30 * sensitivity, -3 * sensitivity},
-  {-29 * sensitivity, -13 * sensitivity},
-  {-9 * sensitivity, 8 * sensitivity},
-  {-12 * sensitivity, 2 * sensitivity},
-  {-7 * sensitivity, 1 * sensitivity},
-  {0 * sensitivity, 1 * sensitivity},
-  {4 * sensitivity, 7 * sensitivity},
-  {25 * sensitivity, 7 * sensitivity},
-  {14 * sensitivity, 4 * sensitivity},
-  {25 * sensitivity, -3 * sensitivity},
-  {31 * sensitivity, -9 * sensitivity},
-  {6 * sensitivity, 3 * sensitivity},
-  {-12 * sensitivity, 3 * sensitivity},
-  {13 * sensitivity, -1 * sensitivity},
-  {10 * sensitivity, -1 * sensitivity},
-  {16 * sensitivity, -4 * sensitivity},
-  {-9 * sensitivity, 5 * sensitivity},
-  {-32 * sensitivity, -5 * sensitivity},
-  {-24 * sensitivity, -3 * sensitivity},
-  {-15 * sensitivity, 5 * sensitivity},
-  {6 * sensitivity, 8 * sensitivity},
-  {-14 * sensitivity, -3 * sensitivity},
-  {-24 * sensitivity, -14 * sensitivity},
-  {-13 * sensitivity, -1 * sensitivity}
-}
-const int mp7_rcs[][2] = {
-  
-}
+  {4 * sensitivity * gl_sense, 4 * sensitivity * gl_sense},
+  {-2 * sensitivity * gl_sense, 5 * sensitivity * gl_sense},
+  {6 * sensitivity * gl_sense, 10 * sensitivity * gl_sense},
+  {12 * sensitivity * gl_sense, 15 * sensitivity * gl_sense},
+  {-1 * sensitivity * gl_sense, 21 * sensitivity * gl_sense},
+  {2 * sensitivity * gl_sense, 24 * sensitivity * gl_sense},
+  {6 * sensitivity * gl_sense, 16 * sensitivity * gl_sense},
+  {11 * sensitivity * gl_sense, 10 * sensitivity * gl_sense},
+  {-4 * sensitivity * gl_sense, 14 * sensitivity * gl_sense},
+  {-22 * sensitivity * gl_sense, 8 * sensitivity * gl_sense},
+  {-30 * sensitivity * gl_sense, -3 * sensitivity * gl_sense},
+  {-29 * sensitivity * gl_sense, -13 * sensitivity * gl_sense},
+  {-9 * sensitivity * gl_sense, 8 * sensitivity * gl_sense},
+  {-12 * sensitivity * gl_sense, 2 * sensitivity * gl_sense},
+  {-7 * sensitivity * gl_sense, 1 * sensitivity * gl_sense},
+  {0 * sensitivity * gl_sense, 1 * sensitivity * gl_sense},
+  {4 * sensitivity * gl_sense, 7 * sensitivity * gl_sense},
+  {25 * sensitivity * gl_sense, 7 * sensitivity * gl_sense},
+  {14 * sensitivity * gl_sense, 4 * sensitivity * gl_sense},
+  {25 * sensitivity * gl_sense, -3 * sensitivity * gl_sense},
+  {31 * sensitivity * gl_sense, -9 * sensitivity * gl_sense},
+  {6 * sensitivity * gl_sense, 3 * sensitivity * gl_sense},
+  {-12 * sensitivity * gl_sense, 3 * sensitivity * gl_sense},
+  {13 * sensitivity * gl_sense, -1 * sensitivity * gl_sense},
+  {10 * sensitivity * gl_sense, -1 * sensitivity * gl_sense},
+  {16 * sensitivity * gl_sense, -4 * sensitivity * gl_sense},
+  {-9 * sensitivity * gl_sense, 5 * sensitivity * gl_sense},
+  {-32 * sensitivity * gl_sense, -5 * sensitivity * gl_sense},
+  {-24 * sensitivity * gl_sense, -3 * sensitivity * gl_sense},
+  {-15 * sensitivity * gl_sense, 5 * sensitivity * gl_sense},
+  {6 * sensitivity * gl_sense, 8 * sensitivity * gl_sense},
+  {-14 * sensitivity * gl_sense, -3 * sensitivity * gl_sense},
+  {-24 * sensitivity * gl_sense, -14 * sensitivity * gl_sense},
+  {-13 * sensitivity * gl_sense, -1 * sensitivity * gl_sense}
+};
 
 void setup() {
-  pinMode(ledPin, OUTPUT);
   Serial.begin(9600);
   Mouse.begin();
+  Wire.begin();
+  u8g2.begin();
+  u8g2.clearBuffer();
+  u8g2.print("RCS System");
 }
 
 void loop() {
 
+  u8g2.setFont(u8g2_font_logisoso32_tf);
+  u8g2.setCursor(0, 50);
+
   if (Serial.available() > 0) {
+
     char inputChar = Serial.read();
-
-    if (rcs_toggle == true) {
-      digitalWrite(ledPin, HIGH);
-    } else { 
-      digitalWrite(ledPin, LOW);
-    }
-
+    
     if (inputChar == 'x') {
-      rcs_toggle = !rcs_toggle;
-    } else {
-      int index = inputChar - '1'; 
-      if (contro && index < sizeof(movements) / sizeof(movements[0])) {
-        if (rcs_toggle == true) {
-          Mouse.move(movements[index][0], movements[index][1]);
-          delay(90);
-        } else {
-          if (index < sizeof(movements2) / sizeof(movements2[0])) {
-            Mouse.move(movements2[index][0], movements2[index][1]);
-            delay(90);
-          }
-        }
+      if (controller >= 3) {
+        controller = 0;
       }
+      controller++; 
+
+      } else {
+    u8g2.clearBuffer();
+    switch(controller) {
+      case 0: 
+        u8g2.print("rcs off"); 
+        break;
+      case 1: 
+        u8g2.print("AK47"); 
+        break;
+      case 2: 
+        u8g2.print("M4A4"); 
+        break;
+      case 3:
+        u8g2.print("GALIL"); 
+        break;
+      }
+    u8g2.sendBuffer();
+        
+        int index = inputChar - '1'; 
+        
+        // if ( controller == 1 && index >= 0 && index < sizeof(ak47_rcs) / sizeof(ak47_rcs[0])) {
+        //   Mouse.move(ak47_rcs[index][0], ak47_rcs[index][1]);
+        //   delay(delay_factor_ak47);
+        // } else if ( controller == 2 && index >= 0 && index < sizeof(m4a4_rcs) / sizeof(m4a4_rcs[0])) {
+        //   Mouse.move(m4a4_rcs[index][0], m4a4_rcs[index][1]);
+        //   delay(delay_factor_m4a4);
+        // } else if ( controller == 3 && index >= 0 && index < sizeof(galil_rcs) / sizeof(galil_rcs[0])) {
+        //   Mouse.move(galil_rcs[index][0], galil_rcs[index][1]);
+        //   delay(delay_factor_galil);
+        // } else {
+
+        // }
     }
   }
 }
+
+
